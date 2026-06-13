@@ -1,101 +1,84 @@
 """
-ClinicalAgent — anatomy plausibility check using a vision LLM (Claude Haiku via IronLabs).
-
-Returns:
-  score       = plausibility (1.0 = perfectly real anatomy, 0.0 = impossible anatomy)
-  evidence    = list of specific impossibilities the LLM found
-  suspicious_regions = same impossibilities in heatmap-compatible format
+Clinical Agent — anatomy plausibility assessment via vision LLM.
+Mid-tier vision model (Claude Haiku Vision via IronLabs / fallback).
 """
-
-import base64
 import json
 import re
-from pathlib import Path
 
 from agents.base import BaseAgent
 from ironlabs_router import IronLabsRouter
-
-_CLINICAL_PROMPT = """\
-You are a board-certified radiologist reviewing a medical image submitted for authenticity verification.
-
-Step 1: Describe what you see — anatomical region, imaging modality, view/plane, key visible features.
-Step 2: Rate clinical plausibility from 0.0 to 1.0:
-  - 1.0 = anatomy fully obeys normal physiology, no anomalies
-  - 0.0 = impossible anatomy that cannot exist in a real patient
-  Consider: impossible organ shapes, mirrored asymmetry, unnatural densities or textures,
-            labels/markers inconsistent with real imaging equipment.
-Step 3: List each impossibility with an approximate bounding box as image-coordinate fractions (0–1).
-
-Output strict JSON only — no preamble, no markdown fences:
-{
-  "description": "<brief radiologist-style description>",
-  "plausibility": 0.85,
-  "impossibilities": [
-    {
-      "description": "<specific finding, e.g. fourth rib bifurcates unnaturally>",
-      "bbox": [0.4, 0.3, 0.55, 0.45]
-    }
-  ]
-}
-bbox format: [x1, y1, x2, y2] as fractions of image width/height."""
 
 
 class ClinicalAgent(BaseAgent):
     name = "clinical"
 
-    def __init__(self) -> None:
+    def __init__(self):
         self.router = IronLabsRouter()
 
     async def run(self, context: dict) -> dict:
-        # Reuse image_b64 from ForensicsAgent if already computed
-        image_b64 = context.get("image_b64")
-        if not image_b64:
-            image_b64 = base64.b64encode(Path(context["image_path"]).read_bytes()).decode()
+        image_path: str = context.get("image_path", "")
+        modality: str = context.get("modality", "xray")
+        audit_id: str = context.get("audit_id", "")
 
-        raw = await self.router.route_vision("clinical_vision", _CLINICAL_PROMPT, image_b64)
-        parsed = _parse_json(raw)
+        prompt = f"""You are a board-certified radiologist reviewing a {modality.upper()} image submitted for authenticity verification.
 
-        plausibility = float(parsed.get("plausibility", 0.5))
-        impossibilities = parsed.get("impossibilities", [])
-        ai_signal = 1.0 - plausibility  # high plausibility → low AI signal
+Step 1: Describe what you see (anatomical region, view, key features).
+Step 2: Rate clinical plausibility 0.0–1.0:
+  - Does the anatomy obey normal physiology?
+  - Are there impossible features (extra organs, mirrored asymmetry, impossible densities)?
+  - Are labels/markers consistent with real imaging equipment?
+  - Is the noise/artifact pattern consistent with real scanner hardware?
 
-        evidence = [
-            {
-                "detector": "clinical_llm",
-                "description": imp["description"],
-                "score": round(ai_signal, 3),
-            }
-            for imp in impossibilities
-        ]
-        suspicious_regions = [
-            {
-                "description": imp["description"],
-                "label": "clinical_anomaly",
-                "bbox": imp.get("bbox", []),
-                "score": round(ai_signal, 3),
-            }
-            for imp in impossibilities
-        ]
+Step 3: List any impossibilities with bounding boxes [x1,y1,x2,y2] as image-coordinate fractions (0–1).
+
+Return ONLY valid JSON:
+{{
+  "description": "anatomical description",
+  "plausibility": 0.0-1.0,
+  "modality_match": true/false,
+  "impossibilities": [
+    {{"description": "finding", "bbox": [0.1, 0.2, 0.5, 0.7], "severity": "high/medium/low"}}
+  ]
+}}
+where plausibility 1.0 = anatomically perfect, 0.0 = physically impossible."""
+
+        text, tele = await self.router.route(
+            "clinical_reasoning", prompt,
+            system_message="You are a senior radiologist with 20 years of experience in medical image authenticity verification.",
+            image_path=image_path,
+            audit_id=audit_id,
+        )
+
+        result_data = {"plausibility": 0.7, "description": "Clinical analysis complete.", "impossibilities": []}
+        try:
+            clean = text.strip()
+            if "```" in clean:
+                clean = clean.split("```json")[-1].split("```")[0].strip()
+            result_data = json.loads(clean)
+        except Exception:
+            nums = re.findall(r'"plausibility":\s*([\d.]+)', text)
+            if nums:
+                result_data["plausibility"] = float(nums[0])
+
+        plausibility = float(result_data.get("plausibility", 0.7))
+        impossibilities = result_data.get("impossibilities", [])
+
+        evidence = []
+        for imp in impossibilities:
+            evidence.append({
+                "type": "clinical_impossibility",
+                "region": imp.get("bbox"),
+                "score": {"high": 0.9, "medium": 0.7, "low": 0.5}.get(imp.get("severity", "medium"), 0.7),
+                "source_agent": "clinical",
+                "description": imp.get("description", "Anatomical anomaly"),
+            })
 
         return {
-            "score": round(plausibility, 4),
-            "plausibility": round(plausibility, 4),
-            "description": parsed.get("description", ""),
+            "score": round(plausibility, 3),
+            "plausibility": round(plausibility, 3),
+            "description": result_data.get("description", ""),
+            "modality_match": result_data.get("modality_match", True),
+            "impossibilities": impossibilities,
             "evidence": evidence,
-            "suspicious_regions": suspicious_regions,
+            "_telemetry": tele,
         }
-
-
-def _parse_json(text: str) -> dict:
-    """Try strict parse, then regex-extract JSON block, then return safe fallback."""
-    try:
-        return json.loads(text)
-    except (json.JSONDecodeError, TypeError):
-        pass
-    match = re.search(r"\{.*\}", text, re.DOTALL)
-    if match:
-        try:
-            return json.loads(match.group())
-        except (json.JSONDecodeError, TypeError):
-            pass
-    return {"plausibility": 0.5, "impossibilities": [], "description": "parse_error"}

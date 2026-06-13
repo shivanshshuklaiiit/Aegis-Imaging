@@ -1,3 +1,4 @@
+"""Base agent interface — all 5 agents implement this."""
 from abc import ABC, abstractmethod
 import time
 
@@ -10,12 +11,12 @@ class BaseAgent(ABC):
         try:
             result = await self.run(context)
             result["agent"] = self.name
+            result.setdefault("error", None)
             result["latency_ms"] = int((time.time() - start) * 1000)
-            result["error"] = None
         except Exception as e:
             result = {
                 "agent": self.name,
-                "score": 0.0,
+                "score": 0.5,
                 "evidence": [],
                 "latency_ms": int((time.time() - start) * 1000),
                 "error": str(e),
@@ -24,14 +25,4 @@ class BaseAgent(ABC):
 
     @abstractmethod
     async def run(self, context: dict) -> dict:
-        """
-        Args:
-          context: shared dict with at minimum:
-                   image_path (str), sha256 (str), modality (str)
-                   Plus outputs from prior agents keyed by agent name.
-        Returns:
-          dict with at minimum:
-          { score: float, evidence: list, ...domain-specific keys }
-          The execute() wrapper adds: agent, latency_ms, error.
-        """
         ...

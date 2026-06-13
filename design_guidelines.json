@@ -1,0 +1,107 @@
+{
+  "project_name": "RxGuard",
+  "description": "Prescription verification API SaaS platform for online pharmacies.",
+  "theme": "Light Theme",
+  "archetype": "Archetype 4: Swiss & High-Contrast (blended with HealthTech precision)",
+  "colors": {
+    "background": "#F2F4F8",
+    "surface": "#FFFFFF",
+    "sidebar": "#232E32",
+    "primary": "#1B47DB",
+    "primary_hover": "#1436A3",
+    "accent": "#B26552",
+    "text_main": "#1A202C",
+    "text_muted": "#718096",
+    "border": "#E2E8F0",
+    "success": "#38A169"
+  },
+  "typography": {
+    "font_family": "Onest",
+    "headings": {
+      "family": "Onest",
+      "weight": "font-bold",
+      "tracking": "tracking-tight"
+    },
+    "body": {
+      "family": "Onest",
+      "weight": "font-normal",
+      "tracking": "tracking-normal"
+    }
+  },
+  "surface_strategies": {
+    "cards": "Clean card-based layout with rounded corners (rounded-xl), subtle ambient shadows (shadow-sm), white backgrounds.",
+    "sidebar": "Dark sidebar (#232E32) with high contrast white text and electric blue (#1B47DB) active states.",
+    "accents": "Gradient accents on key metrics cards (e.g., from-white to-blue-50/20) and terracotta highlights for warnings or suspicious rates."
+  },
+  "spacing_and_layout": {
+    "general": "Generous whitespace. Use p-6 or p-8 for cards to let content breathe.",
+    "dashboard_grid": "Bento or control room style: grid-cols-1 md:grid-cols-3 lg:grid-cols-4 with gap-6. Charts span larger columns."
+  },
+  "pages": [
+    {
+      "name": "Landing Page",
+      "focus": "Targeting pharmacy businesses. Hero section highlighting API speed and reliability. High impact imagery.",
+      "components_needed": ["HeroSection", "FeaturesGrid", "IntegrationMarquee", "CTA"]
+    },
+    {
+      "name": "Auth",
+      "focus": "Login/Register. Email + Google OAuth. Split screen with a medical/code abstract image on one side, clean form on the other.",
+      "components_needed": ["AuthForm", "OAuthButtons"]
+    },
+    {
+      "name": "Dashboard",
+      "focus": "Analytics cards (total verified, valid/invalid/suspicious rates, fraud caught, API call count, cost savings). Horizontal bar charts with diagonal line fill. Line graphs for trends. Recent verification table.",
+      "components_needed": ["MetricCards", "RechartsLineChart", "RechartsBarChart (custom diagonal pattern)", "DataTable"]
+    },
+    {
+      "name": "API Keys",
+      "focus": "Generate key with name/description, list keys with usage stats, copy to clipboard, revoke key, show endpoint code snippets.",
+      "components_needed": ["KeyManager", "SnippetTabs", "UsageTable"]
+    },
+    {
+      "name": "Developer Docs",
+      "focus": "Quick start guide, code examples (cURL, JS, Python), webhook setup. Sidebar navigation.",
+      "components_needed": ["CodeBlock", "DocsNav", "MarkdownContent"]
+    },
+    {
+      "name": "Billing",
+      "focus": "3 Plans (Free 100/mo, Pro $29 10k/mo, Enterprise $99 unlimited). Clear pricing cards with primary and accent buttons.",
+      "components_needed": ["PricingCards", "FeatureList"]
+    }
+  ],
+  "components_instructions": {
+    "charts": "Use Recharts. For the horizontal bar chart, define an SVG <pattern> for the diagonal line fill style and apply it to the bar fill.",
+    "icons": "Use lucide-react.",
+    "tables": "Use Shadcn Table components. Add hover states to rows.",
+    "buttons": "Rounded-lg. Primary button uses electric blue (#1B47DB). Warnings/Destructive use terracotta (#B26552).",
+    "testing": "All interactive and key informational elements MUST include a `data-testid` attribute (e.g., `data-testid=\"login-submit-button\"`)."
+  },
+  "media": {
+    "hero_image": {
+      "url": "https://images.unsplash.com/photo-1576602976047-174e57a47881?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzV8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBwaGFybWFjeSUyMHRlY2hub2xvZ3l8ZW58MHx8fHwxNzgxMzM4ODk0fDA&ixlib=rb-4.1.0&q=85",
+      "description": "Modern clean pharmacy environment"
+    },
+    "docs_abstract": {
+      "url": "https://images.unsplash.com/photo-1610563166150-b34df4f3bcd6?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDJ8MHwxfHNlYXJjaHwxfHxkZXZlbG9wZXIlMjBjb2RlJTIwYWJzdHJhY3R8ZW58MHx8fHwxNzgxMzM4ODkzfDA&ixlib=rb-4.1.0&q=85",
+      "description": "Developer code abstract"
+    },
+    "partner_logos": [
+      {
+        "url": "https://images.unsplash.com/photo-1705988142466-e468bc654eeb?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2OTV8MHwxfHNlYXJjaHwxfHxjb21wYW55JTIwbG9nbyUyMHdoaXRlJTIwYmFja2dyb3VuZHxlbnwwfHx8fDE3ODEzMDc2NTJ8MA&ixlib=rb-4.1.0&q=85",
+        "description": "3D Tech Logo"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1764344815160-0e2afc6939a0?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2OTV8MHwxfHNlYXJjaHwyfHxjb21wYW55JTIwbG9nbyUyMHdoaXRlJTIwYmFja2dyb3VuZHxlbnwwfHx8fDE3ODEzMDc2NTJ8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Subway style logo"
+      }
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Ensure `Onest` font is applied globally as the user explicitly requested.",
+    "Implement the dark sidebar EXACTLY with the hex #232E32.",
+    "Use Recharts for the dashboard and implement the custom diagonal line fill using SVG patterns for the bar chart.",
+    "Apply `data-testid` to EVERY interactive element.",
+    "Use pure HTML/Tailwind for the Landing Page layout to ensure creative freedom. Use Shadcn components for Dashboard and Apps heavily customized to match the provided colors.",
+    "Strictly follow the color palette provided: #1B47DB for primary actions and #B26552 for terracotta highlights/warnings."
+  ]
+}

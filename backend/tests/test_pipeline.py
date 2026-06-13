@@ -41,7 +41,8 @@ CLINICAL_WEIGHT  = 0.375   # 0.3 / (0.5 + 0.3)
 
 
 async def run_image(path: Path, forensics: ForensicsAgent, clinical: ClinicalAgent) -> dict:
-    context: dict = {"image_path": str(path), "sha256": "", "modality": "unknown"}
+    image_bytes = path.read_bytes()
+    context: dict = {"image_path": str(path), "image_bytes": image_bytes, "sha256": "", "modality": "unknown"}
     forensics_r, clinical_r = await asyncio.gather(
         forensics.execute(context),
         clinical.execute(context),

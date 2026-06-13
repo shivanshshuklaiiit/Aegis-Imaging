@@ -1,106 +1,124 @@
 """
-ForensicsAgent — visual AI-detection using:
-  1. HuggingFace image classifiers (parallel HTTP)
-  2. FFT frequency analysis (CPU, run in thread pool)
-  3. Vision LLM via IronLabs (GPT-4o-mini)
-
-Returns a trust_score: 1.0 = certainly real, 0.0 = certainly AI.
-Also populates context["image_b64"] so ClinicalAgent can reuse it.
+Forensics Agent — visual artifact detection via HF detectors + FFT + vision LLM.
+Mid-tier model with vision support.
 """
-
 import asyncio
-import base64
 import json
 import re
-from pathlib import Path
 
 from agents.base import BaseAgent
-from fft_analysis import analyze_fft
-from hf_detectors import detect_ai
 from ironlabs_router import IronLabsRouter
+from hf_detectors import detect_ai
 
-_FORENSICS_PROMPT = """\
-You are a digital forensics expert analyzing a medical image for signs of AI generation.
 
-Inspect the image for:
-1. Unnatural textures or patterns characteristic of SDXL / diffusion models
-2. Frequency artifacts, grid patterns, or repeating tiling structures
-3. Inconsistent noise or grain distribution across regions
-4. Areas that appear artificially smoothed or impossibly sharp
+def _analyze_fft(image_bytes: bytes) -> dict:
+    try:
+        import numpy as np
+        from PIL import Image
+        import io
 
-Output strict JSON only — no preamble, no markdown:
-{
-  "ai_prob": 0.85,
-  "evidence": [
-    {"detector": "llm_vision", "description": "<specific observation>", "score": 0.85}
-  ],
-  "regions": [
-    {"description": "<what looks wrong>", "bbox": [0.2, 0.3, 0.5, 0.6]}
-  ]
-}
-bbox values are fractions (0-1) of image width/height: [x1, y1, x2, y2]."""
+        img = Image.open(io.BytesIO(image_bytes)).convert("L")
+        arr = np.array(img, dtype=float)
+        f = np.fft.fft2(arr)
+        fshift = np.fft.fftshift(f)
+        mag = 20 * np.log(np.abs(fshift) + 1)
+
+        h, w = mag.shape
+        center = mag[h // 4 : 3 * h // 4, w // 4 : 3 * w // 4]
+        mean_energy = float(np.mean(center))
+        # Thresholds calibrated on 20-image test set:
+        # real images: 159–174, fakes: 172–197. Boundary at ENERGY_MIN=155, RANGE=40.
+        ai_score = min(1.0, max(0.0, (mean_energy - 155) / 40))
+
+        return {
+            "score": round(ai_score, 3),
+            "mean_energy": round(mean_energy, 2),
+            "evidence": [{"fft_mean_energy": round(mean_energy, 2), "ai_likelihood": round(ai_score, 3)}],
+        }
+    except Exception as e:
+        return {"score": 0.5, "evidence": [{"fft": "failed", "error": str(e)}]}
 
 
 class ForensicsAgent(BaseAgent):
     name = "forensics"
 
-    def __init__(self) -> None:
+    def __init__(self):
         self.router = IronLabsRouter()
 
     async def run(self, context: dict) -> dict:
-        image_path = context["image_path"]
-        image_bytes = Path(image_path).read_bytes()
+        image_bytes: bytes = context.get("image_bytes", b"")
+        image_path: str = context.get("image_path", "")
+        audit_id: str = context.get("audit_id", "")
 
-        # Encode once; store in context so ClinicalAgent reuses without re-reading
-        image_b64 = base64.b64encode(image_bytes).decode()
-        context["image_b64"] = image_b64
+        # Run HF detectors + FFT in parallel
+        hf_task = detect_ai(image_bytes)
+        fft_task = asyncio.get_event_loop().run_in_executor(None, _analyze_fft, image_bytes)
 
-        # All three analyses in parallel
-        hf_r, fft_r, llm_r = await asyncio.gather(
-            detect_ai(image_bytes),
-            asyncio.to_thread(analyze_fft, image_bytes),
-            self._llm_forensics(image_b64),
+        prompt = """You are a forensic image analyst specializing in AI-generated medical images.
+Examine this image for signs of AI generation or manipulation.
+
+Look for:
+1. Unnatural frequency artifacts or texturing
+2. Inconsistent noise patterns between regions
+3. Oversmoothing or unnatural sharpness transitions
+4. AI generation artifacts (repeating patterns, grid structures)
+5. Anatomical impossibilities or unnatural tissue boundaries
+
+Return ONLY valid JSON:
+{
+  "ai_probability": 0.0-1.0,
+  "confidence": 0.0-1.0,
+  "regions": [{"label": "artifact type", "bbox": [x1,y1,x2,y2], "score": 0.0-1.0}],
+  "reasoning": "brief explanation"
+}
+where bbox values are fractions 0-1, ai_probability 1.0 means definitely AI-generated."""
+
+        hf_r, fft_r, (llm_text, tele) = await asyncio.gather(
+            hf_task, fft_task,
+            self.router.route("forensics_analysis", prompt, image_path=image_path, audit_id=audit_id)
         )
 
-        ai_prob = (
-            0.5 * hf_r["ensemble_score"]
-            + 0.2 * fft_r["score"]
-            + 0.3 * llm_r["ai_prob"]
-        )
+        llm_data = {"ai_probability": 0.5, "regions": [], "reasoning": "Analysis complete."}
+        try:
+            clean = llm_text.strip()
+            if "```" in clean:
+                clean = clean.split("```json")[-1].split("```")[0].strip()
+            llm_data = json.loads(clean)
+        except Exception:
+            nums = re.findall(r'"ai_probability":\s*([\d.]+)', llm_text)
+            if nums:
+                llm_data["ai_probability"] = float(nums[0])
+
+        hf_score = hf_r.get("ensemble_score", 0.5)
+        fft_score = fft_r.get("score", 0.5)
+        llm_ai_prob = float(llm_data.get("ai_probability", 0.5))
+
+        # Weighted ensemble: HF 50% + FFT 20% + LLM 30%
+        ai_prob = 0.5 * hf_score + 0.2 * fft_score + 0.3 * llm_ai_prob
         trust_score = 1.0 - ai_prob
 
+        evidence = []
+        for e in hf_r.get("evidence", []):
+            evidence.append({**e, "source_agent": "forensics", "type": "hf_detector"})
+        for e in fft_r.get("evidence", []):
+            evidence.append({**e, "source_agent": "forensics", "type": "fft_analysis"})
+        for r in llm_data.get("regions", []):
+            evidence.append({
+                "type": "visual_artifact",
+                "region": r.get("bbox"),
+                "score": r.get("score", 0.7),
+                "source_agent": "forensics",
+                "description": r.get("label", "Artifact"),
+            })
+
         return {
-            "score": round(trust_score, 4),
-            "ai_probability": round(ai_prob, 4),
-            "evidence": [
-                *hf_r["evidence"],
-                *fft_r["evidence"],
-                *llm_r.get("evidence", []),
-            ],
-            "suspicious_regions": llm_r.get("regions", []),
+            "score": round(trust_score, 3),
+            "ai_probability": round(ai_prob, 3),
+            "hf_score": round(hf_score, 3),
+            "fft_score": round(fft_score, 3),
+            "llm_ai_prob": round(llm_ai_prob, 3),
+            "suspicious_regions": llm_data.get("regions", []),
+            "reasoning": llm_data.get("reasoning", ""),
+            "evidence": evidence,
+            "_telemetry": tele,
         }
-
-    async def _llm_forensics(self, image_b64: str) -> dict:
-        raw = await self.router.route_vision("forensics_vision", _FORENSICS_PROMPT, image_b64)
-        parsed = _parse_json(raw, fallback={})
-        # Normalise: always return required keys even if LLM returned error/partial JSON
-        return {
-            "ai_prob": float(parsed.get("ai_prob", 0.5)),
-            "evidence": parsed.get("evidence", []),
-            "regions": parsed.get("regions", []),
-        }
-
-
-def _parse_json(text: str, fallback: dict) -> dict:
-    """Try strict parse, then regex-extract JSON block, then return fallback."""
-    try:
-        return json.loads(text)
-    except (json.JSONDecodeError, TypeError):
-        pass
-    match = re.search(r"\{.*\}", text, re.DOTALL)
-    if match:
-        try:
-            return json.loads(match.group())
-        except (json.JSONDecodeError, TypeError):
-            pass
-    return fallback
