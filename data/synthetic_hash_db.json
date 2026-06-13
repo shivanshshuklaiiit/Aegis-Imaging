@@ -1,0 +1,87 @@
+{
+  "_schema": "v1",
+  "_description": "Perceptual hashes of known AI-generated medical images. Used by IntakeAgent for fast triage. Run scripts/download_test_set.py --hash-only to populate phashes.",
+  "_format": "imagehash.phash(Image.open(path)) converted to hex string",
+  "hashes": [
+    {
+      "filename": "fake_01_xray.png",
+      "phash": "c17b161e4f4f1938",
+      "source": "fakechest.png",
+      "modality": "xray",
+      "subtle": false,
+      "generation_tool": "SDXL"
+    },
+    {
+      "filename": "fake_02_xray.png",
+      "phash": "c17f161a1b193d39",
+      "source": "fakechest1.png",
+      "modality": "xray",
+      "subtle": false,
+      "generation_tool": "SDXL"
+    },
+    {
+      "filename": "fake_03_xray.png",
+      "phash": "9953c43e066c3b3b",
+      "source": "fakechest2.png",
+      "modality": "xray",
+      "subtle": false,
+      "generation_tool": "SDXL"
+    },
+    {
+      "filename": "fake_04_xray.png",
+      "phash": "c93e46194f4d194f",
+      "source": "fakechest3.png",
+      "modality": "xray",
+      "subtle": false,
+      "generation_tool": "SDXL"
+    },
+    {
+      "filename": "fake_05_xray.png",
+      "phash": "c16f3512125b3f2d",
+      "source": "fakechest5.png",
+      "modality": "xray",
+      "subtle": false,
+      "generation_tool": "SDXL"
+    },
+    {
+      "filename": "fake_06_mri.png",
+      "phash": "d24d6fa66c183963",
+      "source": "fakebrain1.png",
+      "modality": "mri",
+      "subtle": false,
+      "generation_tool": "SDXL"
+    },
+    {
+      "filename": "fake_07_mri.png",
+      "phash": "941e4b496b963cb6",
+      "source": "fakebrain2.png",
+      "modality": "mri",
+      "subtle": false,
+      "generation_tool": "SDXL"
+    },
+    {
+      "filename": "fake_08_mri.png",
+      "phash": "d0972fd82d40696f",
+      "source": "fakebrain3.png",
+      "modality": "mri",
+      "subtle": false,
+      "generation_tool": "SDXL"
+    },
+    {
+      "filename": "fake_09_ct.png",
+      "phash": "c0e13b953e5a68ec",
+      "source": "fakeCT.png",
+      "modality": "ct",
+      "subtle": false,
+      "generation_tool": "SDXL"
+    },
+    {
+      "filename": "fake_10_ct.png",
+      "phash": "9d4342ae1f8c3db1",
+      "source": "fakeCT1.png",
+      "modality": "ct",
+      "subtle": false,
+      "generation_tool": "SDXL"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+# ML branch dependencies (P2)
+# Backend-specific deps (FastAPI, aiosqlite, etc.) added by P1 in backend PR
+
+# Async HTTP — HuggingFace API + IronLabs calls
+httpx>=0.27.0
+
+# Image processing
+opencv-python>=4.9.0
+numpy>=1.26.0
+Pillow>=10.3.0
+
+# DICOM parsing
+pydicom>=2.4.4
+
+# Perceptual hashing (used by Intake agent in backend PR; listed here so env is complete)
+imagehash>=4.3.1
+
+# Environment variable loading
+python-dotenv>=1.0.1
