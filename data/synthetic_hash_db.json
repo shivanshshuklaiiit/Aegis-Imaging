@@ -1,0 +1,4 @@
+{
+  "_comment": "Perceptual hashes of known AI-generated images. P2 populates this by H4.",
+  "_format": "{ \"<phash_hex>\": { \"source\": \"sdxl\", \"prompt\": \"...\", \"added\": \"YYYY-MM-DD\" } }"
+}

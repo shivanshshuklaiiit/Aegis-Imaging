@@ -1,0 +1,49 @@
+# Environment
+.env
+.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+
+# Runtime data — root level and backend/ level (tests write here)
+data/aegis.db
+data/test_aegis.db
+data/uploads/
+data/heatmaps/
+data/hf_cache/
+data/ironlabs_log.csv
+data/notifications.log
+backend/data/
+
+# Node — explicit path so VS Code file watcher excludes it
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# TypeScript build artifacts
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
+
+# Demo large binaries
+demo/test_images/
+demo/slides.pdf
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
